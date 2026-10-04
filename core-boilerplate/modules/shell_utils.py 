@@ -1,0 +1,54 @@
+"""
+Shell utilities: safe subprocess execution.
+Never use os.system(). Always use subprocess with timeout and capture.
+"""
+
+import subprocess  # The correct way to run shell commands from Python
+
+
+def run_command(cmd, timeout=30):
+    """
+    Run a shell command safely.
+    Returns (returncode, stdout, stderr).
+    Accepts cmd as a list (recommended) or a string.
+    """
+    # Accept "ls -la" as a string for convenience, but internally we want a list.
+    if isinstance(cmd, str):
+        cmd = cmd.split()
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,  # Capture stdout and stderr instead of printing
+            text=True,            # Return strings, not bytes
+            timeout=timeout,      # Kill the command if it runs too long
+            check=False,          # Don't raise an exception on non-zero exit codes
+        )
+        # strip() removes trailing newlines from output.
+        return result.returncode, result.stdout.strip(), result.stderr.strip()
+
+    except subprocess.TimeoutExpired:
+        # 124 is the conventional exit code for "command timed out" (like GNU timeout).
+        return 124, "", f"Command timed out after {timeout}s"
+    except FileNotFoundError:
+        # 127 is the shell's "command not found".
+        return 127, "", f"Command not found: {cmd[0]}"
+    except Exception as e:
+        return 1, "", str(e)
+
+
+def run_command_safe(cmd, timeout=30):
+    """
+    Run a command and return stdout, or None if it failed.
+    Use when you only care about the output.
+    """
+    code, stdout, _ = run_command(cmd, timeout=timeout)
+    # Only return stdout if the exit code was 0 (success).
+    return stdout if code == 0 else None
+
+
+def command_exists(name):
+    """Return True if a command is available on the system."""
+    # `which` returns exit code 0 if found, 1 if not.
+    code, _, _ = run_command(["which", name])
+    return code == 0

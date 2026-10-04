@@ -1,0 +1,62 @@
+"""
+Time utilities: timestamps, file aging, human-readable durations.
+"""
+
+import os
+import time
+import datetime
+
+
+def now_utc():
+    """Return the current UTC time as an ISO 8601 string."""
+    # isoformat() gives "2026-09-30T14:23:11". We append "Z" for UTC.
+    return datetime.datetime.utcnow().isoformat() + "Z"
+
+
+def file_age_days(path):
+    """Return how old a file is, in days. Returns None if the file is missing."""
+    try:
+        # getmtime = last modified time, as a Unix timestamp (seconds since 1970).
+        modified = os.path.getmtime(path)
+
+        # Subtract modified time from now → age in seconds.
+        age_seconds = time.time() - modified
+
+        # 86400 seconds = 1 day.
+        return round(age_seconds / 86400, 2)
+    except (OSError, FileNotFoundError):
+        return None
+
+
+def is_older_than(path, days):
+    """Return True if the file has not been modified in more than N days."""
+    age = file_age_days(path)
+    if age is None:
+        return False  # Missing file = "not old", so we don't delete it.
+    return age > days
+
+
+def human_duration(seconds):
+    """
+    Convert seconds into a friendly string like '2d 4h 15m'.
+    Useful for logs and alerts.
+    """
+    seconds = int(seconds)
+
+    # divmod(a, b) returns (a // b, a % b) — quotient and remainder.
+    # Each step strips off a larger unit.
+    days, seconds = divmod(seconds, 86400)      # 86400 sec in a day
+    hours, seconds = divmod(seconds, 3600)      # 3600 sec in an hour
+    minutes, seconds = divmod(seconds, 60)      # 60 sec in a minute
+
+    # Build up a string from parts that are non-zero.
+    parts = []
+    if days:
+        parts.append(f"{days}d")
+    if hours:
+        parts.append(f"{hours}h")
+    if minutes:
+        parts.append(f"{minutes}m")
+    if not parts:  # Everything above was 0 — just show seconds.
+        parts.append(f"{seconds}s")
+    return " ".join(parts)  # e.g., "2d 4h 15m"
